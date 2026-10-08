@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1740" height="2350" viewBox="0 0 1740 2350" role="img" aria-labelledby="title description">
+  <title id="title">Durable Microsoft Agent Framework research and presentation workflow</title>
+  <desc id="description">Original geometry-matched preview of the two editable workflow.drawio pages, not an export from the diagrams.net renderer. Page one shows routed and direct requests, immutable research and presentation outputs, full conversation state and optional OneDrive upload. Page two separates fixed worker dispatch from the shared Azure Blob data plane and shows conversation restoration between turns.</desc>
+  <metadata>Preview method: original SVG using the explicit coordinates, ports and routing rails in workflow.drawio. No diagrams.net renderer was available.</metadata>
+  <defs>
+    <style>
+      text { font-family: "Segoe UI", Arial, sans-serif; fill: #183153; }
+      .node { stroke-width: 2; rx: 12; }
+      .harness { fill: #F1F5F9; stroke: #64748B; }
+      .control { fill: #EAF3FF; stroke: #2563A6; }
+      .durable { fill: #E7F5F1; stroke: #187867; }
+      .artifact { fill: #F1EBFA; stroke: #7B56A1; }
+      .optional { fill: #FFF4DE; stroke: #AA7217; stroke-dasharray: 6 4; }
+      .node-text { font-size: 16px; text-anchor: middle; }
+      .small { font-size: 15px; }
+      .durable-text { fill: #163D35; }
+      .artifact-text { fill: #483262; }
+      .optional-text { fill: #69480D; }
+      .heading { font-size: 24px; font-weight: 600; }
+      .section { font-size: 17px; font-weight: 600; fill: #475569; }
+      .caption { font-size: 15px; fill: #475569; }
+      .edge { fill: none; stroke-width: 2; stroke-linejoin: miter; }
+      .blue { stroke: #2563A6; marker-end: url(#blue-arrow); }
+      .teal { stroke: #187867; marker-end: url(#teal-arrow); }
+      .purple { stroke: #7B56A1; marker-end: url(#purple-arrow); }
+      .slate { stroke: #64748B; marker-end: url(#slate-arrow); }
+      .amber { stroke: #AA7217; marker-end: url(#amber-arrow); stroke-dasharray: 6 4; }
+      .edge-label { font-size: 13px; text-anchor: middle; dominant-baseline: central; }
+      .edge-small { font-size: 12px; }
+    </style>
+    <marker id="blue-arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#2563A6"/></marker>
+    <marker id="teal-arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#187867"/></marker>
+    <marker id="purple-arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#7B56A1"/></marker>
+    <marker id="slate-arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#64748B"/></marker>
+    <marker id="amber-arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#AA7217"/></marker>
+  </defs>
+  <rect width="1740" height="2350" fill="#FFFFFF"/>
+  <text x="60" y="27" class="caption">Original geometry-matched SVG preview - not a diagrams.net renderer export</text>
+  <g id="page-1" transform="translate(0 45)">
+    <text id="p1-v2" x="60" y="65" class="heading">01 | Requests, typed MAF flow and durable state</text>
+    <g aria-label="Explicit page one connector routes">
+      <path id="p1-e16" class="edge teal" d="M120 260 L120 330 L120 400"/>
+      <path id="p1-e17" class="edge blue" d="M290 450 L390 450"/>
+      <path id="p1-e18" class="edge blue" d="M620 450 L720 450"/>
+      <path id="p1-e19" class="edge blue" d="M960 450 L1050 450"/>
+      <path id="p1-e20" class="edge blue" d="M240 400 L240 300 L445 300 L445 400"/>
+      <path id="p1-e21" class="edge blue" d="M505 400 L505 350 L1120 350 L1120 400"/>
+      <path id="p1-e22" class="edge purple" d="M840 500 L840 670"/>
+      <path id="p1-e23" class="edge purple" d="M960 720 L1000 720 L1000 580 L1110 580 L1110 500"/>
+      <path id="p1-e24" class="edge purple" d="M1230 500 L1230 670"/>
+      <path id="p1-e25" class="edge blue" d="M1310 450 L1410 450"/>
+      <path id="p1-e26" class="edge blue" d="M505 500 L505 670"/>
+      <path id="p1-e27" class="edge blue" d="M390 720 L290 720"/>
+      <path id="p1-e28" class="edge teal" d="M1540 400 L1540 110 L225 110 L225 160"/>
+      <path id="p1-e29" class="edge slate" d="M1540 500 L1540 670"/>
+      <path id="p1-e30" class="edge amber" d="M1540 770 L1540 910"/>
+    </g>
+    <g aria-label="Page one editable-source vertices">
+      <rect id="p1-v3" x="60" y="160" width="330" height="100" rx="12" class="node durable"/>
+      <text x="225" y="191" class="node-text durable-text"><tspan x="225">Session store - local or Azure Blob</tspan><tspan x="225" dy="20">Full turns and latest ArtifactRefs</tspan><tspan x="225" dy="20">Session lock and revision CAS</tspan></text>
+      <rect id="p1-v4" x="60" y="400" width="230" height="100" rx="12" class="node harness"/>
+      <text x="175" y="431" class="node-text"><tspan x="175">User / CLI harness</tspan><tspan x="175" dy="20">Restore conversation</tspan><tspan x="175" dy="20">Chat or direct PPT</tspan></text>
+      <rect id="p1-v5" x="390" y="400" width="230" height="100" rx="12" class="node control"/>
+      <text x="505" y="431" class="node-text"><tspan x="505">MAF route executor</tspan><tspan x="505" dy="20">Orchestrator decision</tspan><tspan x="505" dy="20">Typed RouteDecision</tspan></text>
+      <rect id="p1-v6" x="720" y="400" width="240" height="100" rx="12" class="node control"/>
+      <text x="840" y="431" class="node-text"><tspan x="840">MAF research executor</tspan><tspan x="840" dy="20">Live web evidence</tspan><tspan x="840" dy="20">Persist research artifacts</tspan></text>
+      <rect id="p1-v7" x="1050" y="400" width="260" height="100" rx="12" class="node control"/>
+      <text x="1180" y="431" class="node-text"><tspan x="1180">MAF PPT executor</tspan><tspan x="1180" dy="20">Verify research and prior deck</tspan><tspan x="1180" dy="20">Model plan + editable render</tspan></text>
+      <rect id="p1-v8" x="1410" y="400" width="260" height="100" rx="12" class="node harness"/>
+      <text x="1540" y="431" class="node-text"><tspan x="1540">CLI completion</tspan><tspan x="1540" dy="20">Commit complete turn</tspan><tspan x="1540" dy="20">Export verified artifacts</tspan></text>
+      <rect id="p1-v9" x="60" y="670" width="230" height="100" rx="12" class="node harness"/>
+      <text x="175" y="711" class="node-text"><tspan x="175">User-visible response</tspan><tspan x="175" dy="20">Message and artifact refs</tspan></text>
+      <rect id="p1-v10" x="390" y="670" width="230" height="100" rx="12" class="node control"/>
+      <text x="505" y="711" class="node-text"><tspan x="505">MAF answer executor</tspan><tspan x="505" dy="20">Clarification or reply</tspan></text>
+      <rect id="p1-v11" x="720" y="670" width="240" height="100" rx="12" class="node artifact"/>
+      <text x="840" y="701" class="node-text small artifact-text"><tspan x="840">Immutable research refs</tspan><tspan x="840" dy="20">research.json + research.md</tspan><tspan x="840" dy="20">Citations and limitations</tspan></text>
+      <rect id="p1-v12" x="1050" y="670" width="260" height="100" rx="12" class="node artifact"/>
+      <text x="1180" y="701" class="node-text small artifact-text"><tspan x="1180">Immutable output refs</tspan><tspan x="1180" dy="20">deck.json + editable PPTX</tspan><tspan x="1180" dy="20">SHA-256 + size + MIME type</tspan></text>
+      <rect id="p1-v13" x="1410" y="670" width="260" height="100" rx="12" class="node harness"/>
+      <text x="1540" y="701" class="node-text small"><tspan x="1540">Local output</tspan><tspan x="1540" dy="20">Editable PPTX and deck JSON</tspan><tspan x="1540" dy="20">Research JSON and Markdown</tspan></text>
+      <rect id="p1-v14" x="1410" y="910" width="260" height="100" rx="12" class="node optional"/>
+      <text x="1540" y="941" class="node-text optional-text"><tspan x="1540">Optional OneDrive</tspan><tspan x="1540" dy="20">Delegated Graph upload</tspan><tspan x="1540" dy="20">Credentials required</tspan></text>
+    </g>
+    <g class="edge-label" aria-label="Page one connector semantics">
+      <text x="180" y="330" class="durable-text">restore history</text>
+      <text x="340" y="434">chat request</text>
+      <text x="670" y="434">research_ppt</text>
+      <text x="1005" y="434">research_ref</text>
+      <text x="342.5" y="284">direct PPT - skip route model</text>
+      <text x="812.5" y="334">ppt / fixed direct route</text>
+      <text x="802" y="585" class="artifact-text">persist</text>
+      <text x="1055" y="564" class="artifact-text">verify ref</text>
+      <text x="1268" y="585" class="artifact-text">persist</text>
+      <text x="1360" y="434">output refs</text>
+      <text x="545" y="585">clarify</text>
+      <text x="340" y="704">reply</text>
+      <text x="875" y="94" class="durable-text">commit complete turn - lock + CAS</text>
+      <text x="1606" y="585">verified bytes</text>
+      <text x="1450" y="840" class="optional-text">optional Graph upload</text>
+    </g>
+    <text id="p1-v15" x="60" y="1077" class="caption"><tspan x="60">Live: model-backed and web-enabled. Demo: deterministic, no web. Direct PPT skips model routing in the start executor, not MAF.</tspan><tspan x="60" dy="21">Harness commits every completed action; main export path shown. Conversation history is not an in-flight MAF checkpoint.</tspan></text>
+  </g>
+  <line x1="60" y1="1180" x2="1680" y2="1180" stroke="#CBD5E1" stroke-width="1"/>
+  <g id="page-2" transform="translate(90 1205)">
+    <text id="p2-v2" x="60" y="70" class="heading">02 | Separate workers, Blob handoff and restart</text>
+    <text id="p2-v3" x="60" y="157" class="section">CONTROL PLANE - caller invokes workers; Blob never schedules containers</text>
+    <g aria-label="Explicit page two connector routes">
+      <path id="p2-e16" class="edge blue" d="M320 270 L440 270"/>
+      <path id="p2-e17" class="edge blue" d="M740 270 L820 270"/>
+      <path id="p2-e18" class="edge blue" d="M1120 270 L1200 270"/>
+      <path id="p2-e19" class="edge teal" d="M180 320 L180 590 L440 590"/>
+      <path id="p2-e20" class="edge purple" d="M590 320 L590 400"/>
+      <path id="p2-e21" class="edge teal" d="M900 550 L900 435 L900 320"/>
+      <path id="p2-e22" class="edge teal" d="M1040 320 L1040 435 L1040 550"/>
+      <path id="p2-e23" class="edge teal" d="M1350 320 L1350 600 L1120 600"/>
+      <path id="p2-e24" class="edge teal" d="M320 870 L440 870"/>
+      <path id="p2-e25" class="edge teal" d="M590 650 L590 735 L590 820"/>
+      <path id="p2-e26" class="edge teal" d="M740 870 L820 870"/>
+      <path id="p2-e27" class="edge teal" d="M1120 870 L1200 870"/>
+    </g>
+    <g aria-label="Page two editable-source vertices">
+      <rect id="p2-v4" x="60" y="220" width="260" height="100" rx="12" class="node harness"/>
+      <text x="190" y="251" class="node-text small"><tspan x="190">Orchestrator process</tspan><tspan x="190" dy="20">Store immutable state snapshot</tspan><tspan x="190" dy="20">Create typed WorkerJob</tspan></text>
+      <rect id="p2-v5" x="440" y="220" width="300" height="100" rx="12" class="node control"/>
+      <text x="590" y="251" class="node-text"><tspan x="590">Dispatch adapter</tspan><tspan x="590" dy="20">In-process or fixed subprocess</tspan><tspan x="590" dy="20">Control plane, not Blob</tspan></text>
+      <rect id="p2-v6" x="820" y="220" width="300" height="100" rx="12" class="node control"/>
+      <text x="970" y="251" class="node-text"><tspan x="970">Research / PPT worker</tspan><tspan x="970" dy="20">Same fixed package and config</tspan><tspan x="970" dy="20">Validate references before use</tspan></text>
+      <rect id="p2-v7" x="1200" y="220" width="300" height="100" rx="12" class="node harness"/>
+      <text x="1350" y="251" class="node-text"><tspan x="1350">Caller receives WorkerResult</tspan><tspan x="1350" dy="20">Session and kind correlation</tspan><tspan x="1350" dy="20">Validated output ArtifactRefs</tspan></text>
+      <rect id="p2-v8" x="440" y="400" width="300" height="100" rx="12" class="node artifact"/>
+      <text x="590" y="431" class="node-text small artifact-text"><tspan x="590">Validated WorkerJob envelope</tspan><tspan x="590" dy="20">state_ref + research_ref + deck_ref</tspan><tspan x="590" dy="20">session_id + kind + prompt</tspan></text>
+      <rect id="p2-v9" x="440" y="550" width="680" height="100" rx="12" class="node durable"/>
+      <text x="780" y="572" class="node-text durable-text"><tspan x="780">SHARED AZURE BLOB DATA PLANE</tspan><tspan x="780" dy="19">Immutable artifacts and state snapshots</tspan><tspan x="780" dy="19">Committed SessionState with revision; session lease</tspan><tspan x="780" dy="19">Research JSON / Markdown and deck JSON / editable PPTX</tspan></text>
+      <text id="p2-v10" x="60" y="757" class="section">RESTART BETWEEN TURNS</text>
+      <rect id="p2-v11" x="60" y="820" width="260" height="100" rx="12" class="node harness"/>
+      <text x="190" y="861" class="node-text"><tspan x="190">New process or container</tspan><tspan x="190" dy="20">Same session_id and Blob config</tspan></text>
+      <rect id="p2-v12" x="440" y="820" width="300" height="100" rx="12" class="node durable"/>
+      <text x="590" y="851" class="node-text small durable-text"><tspan x="590">Load committed SessionState</tspan><tspan x="590" dy="20">Acquire session lease</tspan><tspan x="590" dy="20">Restore all user and assistant turns</tspan></text>
+      <rect id="p2-v13" x="820" y="820" width="300" height="100" rx="12" class="node artifact"/>
+      <text x="970" y="851" class="node-text artifact-text"><tspan x="970">Rehydrate artifact context</tspan><tspan x="970" dy="20">Verify referenced JSON</tspan><tspan x="970" dy="20">Latest research, deck and PPTX</tspan></text>
+      <rect id="p2-v14" x="1200" y="820" width="300" height="100" rx="12" class="node control"/>
+      <text x="1350" y="851" class="node-text small"><tspan x="1350">Continue next conversation turn</tspan><tspan x="1350" dy="20">Fresh MAF workflow execution</tspan><tspan x="1350" dy="20">Commit newer revision</tspan></text>
+    </g>
+    <g class="edge-label" aria-label="Page two connector semantics">
+      <text x="380" y="254">WorkerJob</text>
+      <text x="780" y="254" class="edge-small">fixed code</text>
+      <text x="1160" y="254" class="edge-small">WorkerResult</text>
+      <text x="310" y="574" class="durable-text">state snapshot</text>
+      <text x="513" y="360" class="artifact-text">validate envelope</text>
+      <text x="837" y="435" class="durable-text">read + verify</text>
+      <text x="1104" y="435" class="durable-text">write artifacts</text>
+      <text x="1235" y="584" class="durable-text">lock + CAS</text>
+      <text x="380" y="854" class="durable-text">same session_id</text>
+      <text x="666" y="735" class="durable-text">committed state</text>
+      <text x="780" y="854" class="edge-small durable-text">all turns + refs</text>
+      <text x="1160" y="854" class="edge-small durable-text">next turn</text>
+    </g>
+    <text id="p2-v15" x="60" y="1038" class="caption"><tspan x="60">Separate-container deployment requires an explicit transport adapter and matching worker image; the sample demonstrates fixed subprocess handoff.</tspan><tspan x="60" dy="21">Blob stores data, not code or scheduling. This is conversation restoration between turns, not arbitrary in-flight MAF checkpoint recovery.</tspan></text>
+  </g>
+</svg>

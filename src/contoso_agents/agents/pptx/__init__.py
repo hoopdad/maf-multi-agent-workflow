@@ -33,7 +33,7 @@ def _escape(text: str) -> str:
 
 
 def research_markdown(doc: ResearchDocument) -> str:
-    """Return a readable research artifact, with only validated actual citations."""
+    """Formats stored research as readable Markdown with citations and evidence limitations."""
     doc = ResearchDocument.model_validate(doc.model_dump())
     lines = [f"# {_escape(doc.title)}", "", _escape(doc.summary), "", "## Findings", ""]
     for finding in doc.findings:
@@ -221,7 +221,7 @@ def _content_pages(spec: SlideSpec, available: float) -> list[list[str]]:
 
 
 def render_deck(spec: DeckSpec) -> bytes:
-    """Render all content without truncation; paginate dense slides and sources.
+    """Renders a validated deck as editable Contoso PPTX bytes with pagination and citations.
 
     The output contains a cover, every supplied content slide (possibly continued),
     and readable source appendix pages. Supplied notes are retained verbatim.

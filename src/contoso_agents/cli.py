@@ -31,6 +31,7 @@ from .workflow import invoke
 
 
 def parser() -> argparse.ArgumentParser:
+    """Defines the invoke, history, export, and worker commands used by the terminal harness."""
     root = argparse.ArgumentParser(description="Durable Contoso research/PPT MAF sample")
     commands = root.add_subparsers(dest="command", required=True)
     run = commands.add_parser("invoke", help="Run one turn; reuse --session for later turns")
@@ -74,6 +75,7 @@ class DeliveryError(RuntimeError):
 
 
 def export_artifact(store: ArtifactStore, ref: ArtifactRef, output_dir: Path) -> str:
+    """Exports verified artifact bytes to a local output file and returns its absolute path."""
     target = output_dir / ref.key.split("/")[-2] / ref.filename
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(store.read_artifact(ref))
@@ -81,6 +83,7 @@ def export_artifact(store: ArtifactStore, ref: ArtifactRef, output_dir: Path) ->
 
 
 async def dispatch(args: argparse.Namespace) -> dict:
+    """Routes CLI commands to the workflow, session lookup, artifact export, or worker execution."""
     if args.store is not None:
         os.environ["CONTOSO_STORE"] = args.store
     if args.data_dir is not None:
@@ -152,6 +155,7 @@ async def dispatch(args: argparse.Namespace) -> dict:
 
 
 def main() -> None:
+    """Loads local settings and runs the selected CLI command with JSON results or errors."""
     load_dotenv(Path.cwd() / ".env", override=False)
     logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
     args = parser().parse_args()

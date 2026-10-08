@@ -11,10 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 def utc_now() -> str:
+    """Supplies UTC timestamps for conversation turns, web evidence, and HTTP timing logs."""
     return datetime.now(UTC).isoformat()
 
 
 def unique_citations(values: list[str]) -> list[str]:
+    """Rejects duplicate source IDs when validating research findings and slide citations."""
     if len(values) != len(set(values)):
         raise ValueError("Citation IDs must be unique")
     return values

@@ -38,6 +38,7 @@ def _public_addresses(host: str) -> list[str]:
 
 
 def allowed_hosts() -> tuple[str, ...]:
+    """Loads the host allowlist used to constrain the researcher's public web requests."""
     configured = os.getenv("CONTOSO_WEB_ALLOWED_HOSTS")
     hosts = (
         DEFAULT_HOSTS
@@ -55,6 +56,7 @@ def allowed_hosts() -> tuple[str, ...]:
 
 
 def configured_urls() -> tuple[str, ...]:
+    """Loads optional evidence URLs that the researcher can fetch instead of searching Wikipedia."""
     value = os.getenv("CONTOSO_WEB_URLS", "").strip()
     if not value:
         return ()
@@ -71,6 +73,7 @@ def configured_urls() -> tuple[str, ...]:
 
 
 def validate_url(url: str, hosts: Sequence[str]) -> str:
+    """Rejects web URLs outside the research allowlist before any public evidence is fetched."""
     try:
         parsed = urlsplit(url)
         port = parsed.port

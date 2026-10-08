@@ -59,7 +59,10 @@ def create_app(
     agents: AgentBackend | None = None,
     dispatcher: WorkerDispatcher | None = None,
 ) -> FastAPI:
-    """Load settings at startup, not import; inject the three boundaries for offline tests."""
+    """Builds the local HTTP API over the durable workflow with injectable testing boundaries.
+
+    Settings load when this factory runs, not when the module is imported.
+    """
     load_dotenv(Path.cwd() / ".env", override=False)
     mode = os.getenv("CONTOSO_AGENT_MODE", "live").strip().lower()
     store = store if store is not None else create_store()
@@ -109,6 +112,7 @@ def create_app(
     ]
 
     async def failed_request(request: Request, error: Exception) -> JSONResponse:
+        """Returns a safe HTTP error and logs exception types without exposing provider details."""
         causes = [error]
         while causes[-1].__cause__ is not None and causes[-1].__cause__ not in causes:
             causes.append(causes[-1].__cause__)
@@ -130,12 +134,14 @@ def create_app(
             app.add_exception_handler(error_type, failed_request)
 
     def committed_session(session_id: UUID) -> SessionState:
+        """Loads an existing conversation or rejects an unknown session before API operations."""
         state = store.load_session(str(session_id))
         if state is None:
             raise HTTPException(status_code=404, detail="Session not found.")
         return state
 
     def files(refs: list[ArtifactRef]) -> list[dict]:
+        """Adds session-scoped download URLs to artifact references returned by the API."""
         return [
             {
                 "artifact": ref.model_dump(mode="json"),
@@ -152,6 +158,7 @@ def create_app(
         ]
 
     async def run_turn(session_id: UUID, turn: TurnRequest) -> dict:
+        """Runs one durable agent turn and returns its result and artifact download URLs."""
         result = await invoke(
             store, agents, dispatcher, str(session_id), turn.prompt, direct_ppt=turn.direct_ppt
         )
@@ -164,26 +171,30 @@ def create_app(
 
     @app.get("/health")
     async def health() -> dict:
-        """Readiness of configured components, not a paid model-connectivity probe."""
+        """Reports API liveness and agent mode without making a model call."""
         return {"status": "ok", "agent_mode": mode}
 
     @app.post("/sessions", status_code=201)
     async def create_session(turn: TurnRequest) -> dict:
+        """Starts a new conversation by running the caller's first prompt through the workflow."""
         return await run_turn(uuid4(), turn)
 
     @app.post("/sessions/{session_id}/turns")
     async def add_turn(session_id: UUID, turn: TurnRequest) -> dict:
+        """Restores an existing conversation and runs its next prompt through the workflow."""
         committed_session(session_id)
         return await run_turn(session_id, turn)
 
     @app.get("/sessions/{session_id}")
     async def history(session_id: UUID) -> dict:
+        """Returns committed conversation history and links to its saved artifacts."""
         state = committed_session(session_id)
         refs = {ref.key: ref for turn in state.turns for ref in turn.artifacts}
         return {**state.model_dump(mode="json"), "files": files(list(refs.values()))}
 
     @app.get("/sessions/{session_id}/artifacts/{artifact_id}/{filename}")
     async def download_artifact(session_id: UUID, artifact_id: UUID, filename: str) -> Response:
+        """Returns verified bytes for an artifact belonging to the committed conversation."""
         state = committed_session(session_id)
         key = f"sessions/{session_id}/artifacts/{artifact_id}/{filename}"
         ref = next(
@@ -201,6 +212,7 @@ def create_app(
 
 
 def main() -> None:
+    """Starts the loopback HTTP server that accepts new and continued agent conversations."""
     import uvicorn
 
     uvicorn.run(create_app(), host="127.0.0.1", port=8000)

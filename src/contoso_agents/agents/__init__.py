@@ -396,6 +396,7 @@ _TOOL_LIMITS = {
 
 
 def _model_client():
+    """Creates the configured model client used by all three live agents."""
     foundry_endpoint = os.getenv("AZURE_AI_FOUNDRY_ENDPOINT", "").strip()
     foundry_deployment = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "").strip()
     if foundry_endpoint or foundry_deployment:
@@ -729,7 +730,7 @@ class LiveAgents:
 
 
 def create_agents(mode: str | None = None) -> AgentBackend:
-    """Select explicit demo/live mode; never silently fall back after a live error."""
+    """Creates demo or live agents for the workflow without falling back after live errors."""
     selected = (mode or os.getenv("CONTOSO_AGENT_MODE", "live")).strip().lower()
     if selected == "demo":
         return DemoAgents()

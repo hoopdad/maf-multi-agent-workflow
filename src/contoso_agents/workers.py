@@ -29,19 +29,21 @@ ModelT = TypeVar("ModelT", bound=Contract)
 
 
 def read_json(store: ArtifactStore, ref: ArtifactRef, model: type[ModelT]) -> ModelT:
+    """Reads a verified JSON artifact and validates it against the expected worker contract."""
     if ref.content_type != "application/json":
         raise ValueError("Expected an application/json artifact")
     return model.model_validate_json(store.read_artifact(ref))
 
 
 def put_json(store: ArtifactStore, session_id: str, filename: str, value: Contract) -> ArtifactRef:
+    """Stores a contract as immutable JSON for later workflow or worker steps."""
     return store.put_artifact(
         session_id, filename, value.model_dump_json(indent=2).encode(), "application/json"
     )
 
 
 def extract_job_reference(request: object) -> ArtifactRef:
-    """Accept the direct and wrapped invocation shapes used by hosted agents."""
+    """Parses a worker invocation envelope into the immutable job reference to execute."""
     if not isinstance(request, dict):
         raise ValueError("Worker request must be a JSON object")
     payload = request
@@ -55,6 +57,7 @@ def extract_job_reference(request: object) -> ArtifactRef:
 
 
 def response_envelope(result: WorkerResult) -> dict:
+    """Wraps worker artifact references in the completion response returned by the worker CLI."""
     return {
         "id": f"resp_{uuid4().hex}",
         "object": "response",
@@ -73,6 +76,7 @@ def response_envelope(result: WorkerResult) -> dict:
 async def execute_job(
     store: ArtifactStore, agents: AgentBackend, job_ref: ArtifactRef
 ) -> WorkerResult:
+    """Runs a referenced research or PPT job and saves its results as immutable artifacts."""
     from .agents.pptx import render_deck, research_markdown
 
     job = read_json(store, job_ref, WorkerJob)
@@ -112,6 +116,7 @@ class WorkerDispatcher(Protocol):
 
 
 def validate_worker_result(job: WorkerJob, result: WorkerResult) -> WorkerResult:
+    """Checks that a worker's session, task kind, and output artifacts match its dispatched job."""
     if result.session_id != job.session_id or result.kind != job.kind:
         raise ValueError("Worker response does not match the dispatched job")
     expected = (

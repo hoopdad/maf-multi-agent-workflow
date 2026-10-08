@@ -173,6 +173,7 @@ class AnswerExecutor(Executor):
 
 
 def build_workflow(store: ArtifactStore, agents: AgentBackend, dispatcher: WorkerDispatcher):
+    """Builds the typed MAF graph that routes each turn through research, PPT work, or replies."""
     router = OrchestratorExecutor(agents)
     researcher = ResearchExecutor(store, dispatcher)
     ppt = PptExecutor(store, dispatcher)
@@ -199,6 +200,7 @@ async def invoke(
     *,
     direct_ppt: bool = False,
 ) -> RunResult:
+    """Restores a session, runs one MAF turn, and commits its reply and artifact references."""
     session_id = str(UUID(session_id))
     if not prompt.strip() or len(prompt) > 8000:
         raise ValueError("Prompt must contain 1-8000 characters")

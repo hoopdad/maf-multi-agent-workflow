@@ -403,6 +403,53 @@ PPT and research helpers live under the agent directory without splitting every
 operation into a new file. Durable storage and worker transport remain separate
 because their existing boundaries are part of the lesson.
 
+### Walkthrough: entry points and model calls
+
+For the first code walkthrough, use the CLI: it runs one complete turn and returns
+the conversation ID and generated file paths without requiring an HTTP server.
+From the repository root, with `.env` configured and `az login` complete:
+
+```powershell
+.\.venv\Scripts\python.exe -m contoso_agents invoke `
+  --agent-mode live --worker-mode inprocess `
+  --prompt "Research Azure Private Link using Microsoft Learn and create a Contoso PPT."
+```
+
+Keep `--worker-mode inprocess` for a single-process debugging walkthrough;
+`--direct-ppt` deliberately skips routing and new research.
+
+Follow these steps in code:
+
+1. `__main__.py` calls `cli.main()`, which loads `.env`, parses arguments and calls
+   `cli.dispatch()`.
+2. `dispatch()` creates storage, agents and a dispatcher, then calls
+   `workflow.invoke()`.
+3. `invoke()` restores the conversation, builds the MAF graph with
+   `build_workflow()`, and runs its routing, research, PPT or answer executors.
+4. Worker executors use the dispatcher to reach `workers.execute_job()`, which
+   reads referenced inputs and calls the research or slide-planning agent.
+5. Python renders and saves the generated artifacts; `invoke()` commits the turn,
+   and the CLI exports verified files and prints the result.
+
+The **model connection** is in `agents/__init__.py`, function `_model_client()`.
+It reads `AZURE_AI_FOUNDRY_ENDPOINT` and `AZURE_AI_MODEL_DEPLOYMENT_NAME`, then
+constructs `OpenAIChatCompletionClient(model=foundry_deployment, ...)` with an
+`AsyncOpenAI` client and an Azure CLI token provider. `LiveAgents.__init__()`
+creates the orchestrator, researcher and PPT planner with that shared client;
+their instructions and tools differ, not their configured model deployment.
+
+The **actual model call** is `await agent.run(...)` in
+`LiveAgents._structured()` for routing, research and slide planning.
+`LiveAgents.clarify()` also calls `await self.orchestrator.run(...)` for
+conversation replies. These are useful debugger breakpoints; the CLI prints
+the final result, not a per-agent execution trace. Demo mode uses the same graph
+but never reaches a model call.
+
+For the API walkthrough, start `python -m contoso_agents.api`, open `/docs` and
+submit `POST /sessions`. The path is `api.main()` -> `create_app()` ->
+`create_session()` -> `run_turn()` -> the same `workflow.invoke()`.
+Starting the server or requesting `/health` alone does not call the model.
+
 - [MAF workflow concepts](https://learn.microsoft.com/en-us/agent-framework/concepts/workflows/?pivots=programming-language-python)
 - [Workflow Builder and execution](https://learn.microsoft.com/en-us/agent-framework/concepts/workflows/builder-and-execution?pivots=programming-language-python)
 - [Foundry OpenAI v1 API and endpoint migration](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/switching-endpoints)

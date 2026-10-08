@@ -470,6 +470,7 @@ class AzureBlobStore:
 
 
 def create_store() -> ArtifactStore:
+    """Creates the local or Azure Blob store used for durable sessions and worker artifacts."""
     kind = os.getenv("CONTOSO_STORE", "local").strip().lower()
     if kind == "local":
         directory = os.getenv("CONTOSO_DATA_DIR", ".data")

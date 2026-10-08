@@ -14,7 +14,7 @@ from .models import utc_now
 
 
 def redact_url(url: str) -> str:
-    """Discard credentials, query strings (including SAS), and fragments."""
+    """Removes credentials, queries, and fragments before Azure request URLs enter timing logs."""
     try:
         parts = urlsplit(url)
         hostname = parts.hostname

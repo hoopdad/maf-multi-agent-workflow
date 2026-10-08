@@ -21,6 +21,7 @@ class OneDriveReceipt(BaseModel):
 async def upload_to_onedrive(
     ref: ArtifactRef, data: bytes, client: httpx.AsyncClient | None = None
 ) -> OneDriveReceipt:
+    """Uploads an existing PPT artifact to OneDrive and returns its browser link when requested."""
     token = os.environ.get("ONEDRIVE_ACCESS_TOKEN", "").strip()
     if not token:
         raise ValueError(

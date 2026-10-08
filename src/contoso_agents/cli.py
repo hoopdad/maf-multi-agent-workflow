@@ -13,6 +13,7 @@ from uuid import uuid4
 
 import httpx
 from azure.core.exceptions import AzureError
+from dotenv import load_dotenv
 from pydantic import ValidationError
 
 from .agents import create_agents
@@ -149,6 +150,7 @@ async def dispatch(args: argparse.Namespace) -> dict:
 
 
 def main() -> None:
+    load_dotenv(Path.cwd() / ".env", override=False)
     logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
     args = parser().parse_args()
     try:

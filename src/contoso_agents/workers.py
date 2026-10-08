@@ -73,8 +73,7 @@ def response_envelope(result: WorkerResult) -> dict:
 async def execute_job(
     store: ArtifactStore, agents: AgentBackend, job_ref: ArtifactRef
 ) -> WorkerResult:
-    from .agents import research_markdown
-    from .render import render_deck
+    from .agents.pptx import render_deck, research_markdown
 
     job = read_json(store, job_ref, WorkerJob)
     if not job_ref.belongs_to(job.session_id):

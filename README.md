@@ -1,8 +1,14 @@
 # Durable research and Contoso presentation workflow
 
 A runnable **Microsoft Agent Framework (MAF) Python workflow** with an orchestrator,
-a web researcher, and a PowerPoint agent. A small CLI is the user/backend harness;
-there is deliberately no UI.
+a web researcher, and a PowerPoint agent. A small CLI and a local HTTP API are
+the user/backend harnesses; there is deliberately no UI.
+
+This is a **teaching sample, not a production service**. Live mode calls a model
+deployed in Microsoft Foundry; demo mode remains available for offline learning.
+Read the request, routing, worker and persistence steps in order before refactoring.
+The sample intentionally keeps related logic together instead of introducing a
+settings framework, service layer or a separate conversation engine.
 
 Two entry paths share the same typed MAF graph:
 
@@ -49,12 +55,13 @@ not a claim that a file was generated without providing it.
 `demo` is an **offline deterministic harness**: no model calls, no web access,
 and no fabricated web evidence. It exercises the real MAF graph and actual PPT
 generation. Use `live` for natural-language routing and web-backed research.
-`.env.example` documents settings; the CLI reads environment variables and does
-not automatically load `.env`.
+The CLI and HTTP API load `.env` from the **current working directory**.
+Existing process environment variables take precedence. Run commands from the
+repository root; `.env` is ignored by Git and `.env.example` is the shareable template.
 
 ### Calling the workflow from a Python backend
 
-The CLI is a thin adapter over the same callable that a future backend can use:
+The CLI and HTTP API are thin adapters over the same callable a Python backend can use:
 
 ```python
 import asyncio
@@ -114,27 +121,115 @@ for a language model. A clarification produces an answer without regenerating a
 PPT. Revisions read the saved editable deck specification, generate a new PPT
 artifact, and preserve older versions rather than overwriting them.
 
-## Live agents and web resources
+## Live Foundry model calls with local Azure login
 
-For OpenAI:
+Copy the template, then edit the two Foundry connection values in `.env`:
 
 ```powershell
-$env:OPENAI_API_KEY = "<set securely in this process>"
-$env:OPENAI_MODEL = "gpt-4.1-mini"
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+# Edit .env before proceeding.
+az login
 .\.venv\Scripts\python.exe -m contoso_agents invoke --agent-mode live `
   --prompt "Research Azure Private Link using Microsoft Learn and create a Contoso PPT for architects."
 ```
 
-Alternatively configure `AZURE_OPENAI_ENDPOINT` and
-`AZURE_OPENAI_CHAT_DEPLOYMENT_NAME` and authenticate with Azure identity. The
-identity needs access to that Azure OpenAI deployment; a model's deployment
-name is not necessarily its model name. See `agents.py` for the actual client
-construction. Never commit API keys or bearer tokens.
+```dotenv
+CONTOSO_AGENT_MODE=live
+AZURE_AI_FOUNDRY_ENDPOINT=https://<resource>.services.ai.azure.com/openai/v1/
+AZURE_AI_MODEL_DEPLOYMENT_NAME=<your-deployment-name>
+```
+
+Use the deployment's **OpenAI-compatible v1 endpoint**, not a Foundry project
+URL ending in `/api/projects/...`. The model must support chat completions,
+tool/function calls and structured JSON outputs. The deployment name is not
+necessarily the catalog model name. Foundry resources can also expose the v1
+endpoint under `https://<resource>.openai.azure.com/openai/v1/`; use the endpoint
+shown for your deployment rather than guessing it.
+
+Foundry calls use `AzureCliCredential`, so **you perform `az login` locally**.
+The sample requests a token for `https://ai.azure.com/.default`;
+no API key or copied bearer token belongs in `.env`. Your signed-in identity
+needs model-inference access to the existing resource (for example the
+appropriate Cognitive Services OpenAI User role) and network access to it.
+This sample does not create a deployment or grant access.
+
+For a live test, have the endpoint, deployment name and completed Azure CLI
+login ready. Authentication, unsupported model features and model/network errors
+fail explicitly; live mode never silently switches to demo.
+
+The previous `OPENAI_API_KEY`/`OPENAI_MODEL` and
+`AZURE_OPENAI_ENDPOINT`/`AZURE_OPENAI_CHAT_DEPLOYMENT_NAME` configurations remain
+available for comparison. Foundry settings select the Foundry connection.
+See `src/contoso_agents/agents/__init__.py` for the client construction.
+Never commit keys, tokens or `.env`.
 
 The live orchestrator, researcher and PPT planner are separate MAF model agents.
 Model calls receive conversation context; structured Pydantic outputs constrain
-routing, findings, slides, and citations. The renderer is deterministic Python,
-not model-generated executable code.
+routing, findings, slides, and citation IDs. The planner returns content only;
+Python attaches the exact retrieved source records rather than asking the model
+to reproduce long excerpts, timestamps or URLs. Unknown citation IDs are errors.
+The renderer is deterministic Python, not model-generated executable code.
+
+## HTTP API: create a conversation, then send another turn
+
+Start the local API from the repository root after configuring `.env`:
+
+```powershell
+.\.venv\Scripts\python.exe -m contoso_agents.api
+```
+
+The server listens on `http://127.0.0.1:8000`; its interactive request schemas
+are at `http://127.0.0.1:8000/docs`. It defaults to **live** agents. For a fully
+offline exercise, set `$env:CONTOSO_AGENT_MODE = "demo"` before starting it.
+Do not expose this unauthenticated teaching API to other users or the internet.
+
+```powershell
+$base = "http://127.0.0.1:8000"
+$first = Invoke-RestMethod -Method Post -Uri "$base/sessions" `
+  -ContentType "application/json" `
+  -Body (@{prompt = "Create a Contoso PPT about Azure networking."} | ConvertTo-Json)
+$session = $first.session_id
+
+# A new HTTP request restores the committed history and editable deck.
+$second = Invoke-RestMethod -Method Post -Uri "$base/sessions/$session/turns" `
+  -ContentType "application/json" `
+  -Body (@{prompt = "Add a slide titled Cost controls. Use this bullet: Review Azure costs regularly."} | ConvertTo-Json)
+
+Invoke-RestMethod -Uri "$base/sessions/$session"
+
+# Each response file pairs its immutable artifact reference with a relative URL.
+$ppt = $second.files | Where-Object { $_.artifact.filename -eq "presentation.pptx" }
+Invoke-WebRequest -Uri "$base$($ppt.download_url)" -OutFile ".\presentation.pptx"
+```
+
+Live agents can return a clarification instead of a new artifact when content is
+ambiguous. Supply the requested details as another turn using the same session.
+Keep `$session` when restarting the server and send another request to the same
+turns endpoint. The store, not server memory or a provider-owned thread, holds the
+conversation and latest artifact references. Two requests for the same session
+are serialized by the existing workflow; different sessions have separate history.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /sessions` | Run the first turn and return the new session UUID |
+| `POST /sessions/{session_id}/turns` | Run another turn in an existing conversation |
+| `GET /sessions/{session_id}` | Read all committed turns and latest artifact references |
+| `GET /sessions/{session_id}/artifacts/{artifact_id}/{filename}` | Download a committed, integrity-verified artifact |
+| `GET /health` | Check that the local server responds; not a model/RBAC readiness probe |
+
+Requests accept `prompt` (1-8000 nonblank characters) and optional `direct_ppt`.
+A direct PPT request skips only the routing model call; the live planner still
+calls the model. Unknown session UUIDs are rejected rather than silently creating
+a conversation. Failed turns do not advance the last committed revision.
+
+The API wraps the same `workflow.invoke` used by the CLI. It does not add
+another history store, agent service or remote worker deployment. Artifact
+downloads read verified bytes from the configured local/Blob store; they do not
+depend on a worker's local output path.
+Errors return a non-success HTTP status and a safe explanation. Server diagnostics
+record exception types, not raw provider responses, prompts or tokens.
+
+## Bounded web research
 
 The researcher uses bounded public web tools and records retrieved evidence:
 source ID, URL, title, retrieval timestamp, and excerpt. Web access is restricted
@@ -157,7 +252,9 @@ is a deliberate configuration change, not something web content can request.
 
 Research is saved in both `research.json` (machine contract) and `research.md`
 (human review). The PPT worker reads the exact supplied research reference,
-verifies its integrity, and uses its source IDs. Decks retain source citations
+verifies its integrity, and uses its source IDs. Trusted code attaches cited
+source records unchanged and preserves previous-deck sources during revisions.
+Decks retain source citations
 and a references appendix; a supplied-content-only deck must not pretend to
 have web citations.
 
@@ -290,14 +387,25 @@ require your credentials and an explicit run.
 | --- | --- |
 | `models.py` | Versioned, validated session/research/deck/reference contracts |
 | `workflow.py` | MAF typed executors, conditional edges and per-turn persistence |
-| `agents.py` | Separate live MAF agents and clearly labeled offline demo |
-| `web.py`, `render.py` | Bounded web evidence tools and editable PPT creation |
+| `agents/__init__.py` | Foundry client, separate live MAF agents and clearly labeled offline demo |
+| `agents/research/__init__.py` | Bounded public-web evidence tools |
+| `agents/pptx/__init__.py` | Deterministic editable PPT creation and research Markdown |
 | `storage.py` | Local/Azure durable sessions and immutable artifacts |
 | `workers.py` | Reference-only handoff, envelopes and fixed-code process workers |
-| `cli.py`, `onedrive.py` | User harness, local file delivery, optional Graph upload |
+| `api.py`, `cli.py` | HTTP/terminal request entry points over the same workflow |
+| `onedrive.py` | Optional delegated Graph upload |
+
+All module paths above are relative to `src/contoso_agents`. Read `api.py` or
+`cli.py` first, then follow `workflow.invoke`: load session -> route request ->
+dispatch worker -> plan/render artifacts -> commit the turn. Open
+`agents/__init__.py` to see exactly where the real model calls happen.
+PPT and research helpers live under the agent directory without splitting every
+operation into a new file. Durable storage and worker transport remain separate
+because their existing boundaries are part of the lesson.
 
 - [MAF workflow concepts](https://learn.microsoft.com/en-us/agent-framework/concepts/workflows/?pivots=programming-language-python)
 - [Workflow Builder and execution](https://learn.microsoft.com/en-us/agent-framework/concepts/workflows/builder-and-execution?pivots=programming-language-python)
+- [Foundry OpenAI v1 API and endpoint migration](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/switching-endpoints)
 - [Azure Blob Python overview](https://learn.microsoft.com/en-us/azure/storage/blobs/storage-quickstart-blobs-python)
 - [Hosted-agent reference patterns](https://github.com/hoopdad/foundry-hosted-agent-profiled/blob/main/server_host.py)
 

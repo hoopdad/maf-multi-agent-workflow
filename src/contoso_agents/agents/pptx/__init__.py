@@ -13,7 +13,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
-from .models import DeckSpec, ResearchDocument, SlideSpec
+from ...models import DeckSpec, ResearchDocument, SlideSpec
 
 WIDTH = 13.333333
 HEIGHT = 7.5

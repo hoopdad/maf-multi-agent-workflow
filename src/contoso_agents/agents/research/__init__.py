@@ -14,7 +14,7 @@ from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 
 import httpx
 
-from .models import SourceRecord
+from ...models import SourceRecord
 
 DEFAULT_HOSTS = ("en.wikipedia.org", "learn.microsoft.com", "docs.python.org")
 

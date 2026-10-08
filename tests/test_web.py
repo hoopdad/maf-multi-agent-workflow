@@ -3,7 +3,12 @@ import json
 import httpx
 import pytest
 
-from contoso_agents.web import WebResourceError, WebResources, allowed_hosts, validate_url
+from contoso_agents.agents.research import (
+    WebResourceError,
+    WebResources,
+    allowed_hosts,
+    validate_url,
+)
 
 
 def web_client(handler, **kwargs):

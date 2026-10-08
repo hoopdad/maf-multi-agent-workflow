@@ -1,4 +1,5 @@
 import json
+import time
 from contextvars import ContextVar
 from types import SimpleNamespace
 from uuid import uuid4
@@ -12,9 +13,11 @@ from contoso_agents.agents import (
     DemoAgents,
     LiveAgents,
     UnsupportedDemoRequest,
+    _DeckDraft,
     _evidence_context,
     create_agents,
 )
+from contoso_agents.agents.research import WebResources
 from contoso_agents.models import (
     ArtifactRef,
     DeckSpec,
@@ -26,7 +29,21 @@ from contoso_agents.models import (
     SourceRecord,
     Turn,
 )
-from contoso_agents.web import WebResources
+
+
+@pytest.fixture(autouse=True)
+def isolated_model_environment(monkeypatch):
+    for name in [
+        "AZURE_AI_FOUNDRY_ENDPOINT",
+        "AZURE_AI_MODEL_DEPLOYMENT_NAME",
+        "AZURE_OPENAI_ENDPOINT",
+        "AZURE_OPENAI_CHAT_DEPLOYMENT_NAME",
+        "AZURE_OPENAI_API_VERSION",
+        "OPENAI_API_KEY",
+        "OPENAI_MODEL",
+        "CONTOSO_AGENT_MODE",
+    ]:
+        monkeypatch.delenv(name, raising=False)
 
 
 def state():
@@ -84,6 +101,10 @@ def deck():
         ],
         sources=[source()],
     )
+
+
+def deck_draft(value=None):
+    return _DeckDraft.model_validate((value or deck()).model_dump(exclude={"sources"}))
 
 
 @pytest.mark.parametrize(
@@ -206,6 +227,8 @@ async def test_offline_research_never_fabricates_evidence(monkeypatch):
 
     monkeypatch.setattr("contoso_agents.agents._model_client", fail)
     monkeypatch.setattr("httpx.AsyncClient", fail)
+    monkeypatch.setenv("AZURE_AI_FOUNDRY_ENDPOINT", "invalid-but-unused-in-demo")
+    monkeypatch.setenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "deployment")
     backend = create_agents("demo")
     assert isinstance(backend, AgentBackend)
     doc = await backend.research(state(), "Research Python")
@@ -310,6 +333,94 @@ async def test_live_factories_accept_config_without_authentication_or_network(mo
     await azure_backend.client.client.close()
 
 
+@pytest.mark.parametrize(
+    ("endpoint", "deployment", "message"),
+    [
+        ("", "deployment", "requires"),
+        ("https://contoso.services.ai.azure.com/openai/v1/", "", "requires"),
+        ("http://contoso.services.ai.azure.com/openai/v1/", "deployment", "HTTPS"),
+        ("https://contoso.services.ai.azure.com/", "deployment", "v1"),
+        ("https://contoso.services.ai.azure.com/openai/v2/", "deployment", "v1"),
+        ("https:///openai/v1/", "deployment", "HTTPS"),
+        ("https://user:secret@contoso.services.ai.azure.com/openai/v1/", "deployment", "HTTPS"),
+        ("https://contoso.services.ai.azure.com:8443/openai/v1/", "deployment", "HTTPS"),
+        ("https://contoso.services.ai.azure.com:bad/openai/v1/", "deployment", "HTTPS"),
+        ("https://[malformed/openai/v1/", "deployment", "HTTPS"),
+        ("https://contoso.services.ai.azure.com/openai/v1/?api-version=preview", "d", "HTTPS"),
+        ("https://contoso.services.ai.azure.com/openai/v1/#fragment", "d", "HTTPS"),
+        ("https://contoso.services.ai.azure.com/openai/v1/", "model with spaces", "name"),
+        ("https://contoso.services.ai.azure.com/openai/v1/", "https://model", "name"),
+    ],
+)
+def test_foundry_partial_or_invalid_config_cannot_fall_back(
+    monkeypatch, endpoint, deployment, message
+):
+    monkeypatch.setenv("AZURE_AI_FOUNDRY_ENDPOINT", endpoint)
+    monkeypatch.setenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", deployment)
+    monkeypatch.setenv("OPENAI_API_KEY", "otherwise-valid-offline-key")
+    monkeypatch.setenv("OPENAI_MODEL", "otherwise-valid-model")
+    with pytest.raises(AgentConfigurationError, match=message):
+        create_agents("live")
+
+
+@pytest.mark.parametrize("trailing_slash", ["", "/"])
+async def test_foundry_real_sdk_client_uses_async_cli_token_provider(
+    monkeypatch, trailing_slash
+):
+    from azure.core.credentials import AccessTokenInfo
+    from azure.identity.aio import AzureCliCredential
+    from openai import AsyncAzureOpenAI, AsyncOpenAI
+
+    calls = []
+
+    async def token(_credential, *scopes, **kwargs):
+        calls.append(scopes)
+        return AccessTokenInfo("offline-fake-token", int(time.time()) + 3600)
+
+    monkeypatch.setattr(AzureCliCredential, "get_token", token)
+    monkeypatch.setattr(AzureCliCredential, "get_token_info", token)
+    endpoint = f"https://contoso.services.ai.azure.com/openai/v1{trailing_slash}"
+    monkeypatch.setenv("AZURE_AI_FOUNDRY_ENDPOINT", f" {endpoint} ")
+    monkeypatch.setenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", " teaching-deployment ")
+    # Foundry deliberately wins even when old provider settings are present.
+    monkeypatch.setenv("OPENAI_API_KEY", "ignored-offline-key")
+    monkeypatch.setenv("OPENAI_MODEL", "ignored-openai-model")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://ignored.openai.azure.com/")
+    monkeypatch.setenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME", "ignored-azure-model")
+    backend = create_agents("live")
+    try:
+        assert isinstance(backend.client.client, AsyncOpenAI)
+        assert not isinstance(backend.client.client, AsyncAzureOpenAI)
+        assert backend.client.model == "teaching-deployment"
+        assert str(backend.client.client.base_url) == endpoint.rstrip("/") + "/"
+        assert calls == []  # Construction does not attempt az login or network access.
+        provider = backend.client.client._api_key_provider
+        assert callable(provider)
+        assert await provider() == "offline-fake-token"
+        assert calls == [("https://ai.azure.com/.default",)]
+        # Tokens are cached until nearing expiry, rather than captured as a fixed API key.
+        assert await provider() == "offline-fake-token"
+        assert len(calls) == 1
+    finally:
+        await backend.client.client.close()
+
+
+async def test_live_model_error_propagates_instead_of_returning_demo(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "offline-test-key")
+    monkeypatch.setenv("OPENAI_MODEL", "offline-test-model")
+    backend = create_agents("live")
+
+    async def fail_model(*args, **kwargs):
+        raise RuntimeError("offline-simulated-model-failure")
+
+    monkeypatch.setattr(backend.client.client.chat.completions, "create", fail_model)
+    try:
+        with pytest.raises(Exception, match="offline-simulated-model-failure"):
+            await backend.route(state(), "Research Python")
+    finally:
+        await backend.client.client.close()
+
+
 class StubAgent:
     def __init__(self, result, *, before=None):
         self.result = result
@@ -338,7 +449,7 @@ async def test_live_calls_include_complete_committed_history_and_previous_conten
     session = state()
     backend = stub_backend()
     backend.orchestrator = StubAgent(RouteDecision(action="ppt", instruction="Create PPT"))
-    backend.planner = StubAgent(deck())
+    backend.planner = StubAgent(deck_draft())
     assert (await backend.route(session, "Create PPT about Python")).action == "ppt"
     result = await backend.plan_deck(session, "Create PPT about Python", research(), deck())
     assert result == deck()
@@ -381,23 +492,126 @@ async def test_live_missing_topic_routes_to_clarification_even_if_model_misroute
     assert "topic" in decision.message
 
 
-async def test_planner_rejects_fake_sources_and_unrequested_removal():
+def test_planner_draft_keeps_content_bounds_without_source_record_schema():
+    schema = _DeckDraft.model_json_schema()
+    assert set(schema["properties"]) == {"title", "subtitle", "slides"}
+    assert schema["additionalProperties"] is False
+    assert "SourceRecord" not in schema["$defs"]
+    public_schema = DeckSpec.model_json_schema()
+    for field in ["title", "subtitle", "slides"]:
+        assert schema["properties"][field] == public_schema["properties"][field]
+    assert schema["$defs"]["SlideSpec"] == public_schema["$defs"]["SlideSpec"]
+
+
+async def test_planner_attaches_exact_trusted_metadata_including_full_excerpt():
+    record = source().model_copy(update={"excerpt": "x" * 6000})
+    document = research().model_copy(update={"sources": [record]})
     backend = stub_backend()
-    bad = deck().model_copy(update={"sources": [source(title="Fabricated title")]})
+    backend.planner = StubAgent(deck_draft())
+    result = await backend.plan_deck(state(), "Create PPT about Python", document)
+    assert isinstance(result, DeckSpec)
+    assert result.sources == document.sources
+    assert result.sources[0].model_dump() == record.model_dump()
+    assert len(result.sources[0].excerpt) == 6000
+    assert backend.planner.calls[0][1]["options"]["response_format"] is _DeckDraft
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {},
+        {"title": "Fabricated title"},
+        {"url": "https://docs.python.org/fabricated"},
+        {"excerpt": "Modified excerpt"},
+        {"retrieved_at": "2026-10-09T15:00:00+00:00"},
+    ],
+)
+async def test_planner_rejects_model_supplied_source_records_even_if_unchanged(changes):
+    backend = stub_backend()
+    bad = deck_draft().model_dump()
+    bad["sources"] = [source().model_copy(update=changes).model_dump()]
     backend.planner = StubAgent(bad)
-    with pytest.raises(ValueError, match="fabricated"):
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
         await backend.plan_deck(state(), "Create PPT about Python", research())
-    backend.planner = StubAgent(deck().model_copy(update={"slides": [deck().slides[0]]}))
+
+
+@pytest.mark.parametrize("document", [None, research()])
+async def test_planner_rejects_unknown_citations_before_attaching_evidence(document):
+    proposed = deck_draft()
+    proposed.slides[0].source_ids = ["S99"]
+    backend = stub_backend()
+    backend.planner = StubAgent(proposed)
+    with pytest.raises(ValueError, match="Planner cited unknown source IDs: S99"):
+        await backend.plan_deck(state(), "Create PPT about Python", document)
+
+
+async def test_planner_attaches_only_cited_research_sources_in_ledger_order():
+    records = [source(identifier=f"S{i}") for i in range(1, 13)]
+    document = research().model_copy(update={"sources": records})
+    proposed = deck_draft()
+    proposed.slides[0].source_ids = ["S12", "S2"]
+    backend = stub_backend()
+    backend.planner = StubAgent(proposed)
+    result = await backend.plan_deck(state(), "Create PPT about Python", document)
+    assert result.sources == [records[1], records[11]]
+    context = json.loads(backend.planner.calls[0][0][-1].text)
+    assert context["evidence_sources"] == [record.model_dump() for record in records]
+    assert document.sources == records
+
+
+@pytest.mark.parametrize("prompt", ["Remove Overview", "Keep only the conclusion"])
+async def test_planner_preserves_previous_sources_after_their_cited_slide_is_removed(prompt):
+    original = deck()
+    proposed = deck_draft(original.model_copy(update={"slides": original.slides[1:]}))
+    backend = stub_backend()
+    backend.planner = StubAgent(proposed)
+    result = await backend.plan_deck(state(), prompt, None, original)
+    assert result.slides == original.slides[1:]
+    assert all(not slide.source_ids for slide in result.slides)
+    assert result.sources == original.sources
+
+
+async def test_planner_omits_unused_research_without_dropping_previous_source_records():
+    original = deck().model_copy(
+        update={"sources": [source(identifier=f"S{i}") for i in range(1, 13)]}
+    )
+    document = ResearchDocument(
+        title="Additional evidence",
+        summary="Another bounded review.",
+        findings=[Finding(text="New evidence.", source_ids=["S13"])],
+        sources=[source(identifier=f"S{i}") for i in range(13, 25)],
+    )
+    proposed = deck_draft(original)
+    proposed.slides.append(SlideSpec(title="Pricing", bullets=["User-provided content."]))
+    backend = stub_backend()
+    backend.planner = StubAgent(proposed)
+    result = await backend.plan_deck(state(), "Add Pricing", document, original)
+    assert result.sources == original.sources
+    assert result.slides == proposed.slides
+    context = json.loads(backend.planner.calls[0][0][-1].text)
+    assert len(context["evidence_sources"]) == 24
+    proposed.slides[-1].source_ids = ["S13"]
+    backend.planner = StubAgent(proposed)
+    with pytest.raises(ValueError, match="at most 12"):
+        await backend.plan_deck(state(), "Add Pricing", document, original)
+
+
+async def test_planner_rejects_unrequested_removal_or_unapplied_addition():
+    backend = stub_backend()
+    original = deck()
+    backend.planner = StubAgent(
+        deck_draft(original.model_copy(update={"slides": [original.slides[0]]}))
+    )
     with pytest.raises(ValueError, match="preserve"):
         await backend.plan_deck(state(), "Add Pricing", research(), deck())
-    backend.planner = StubAgent(deck())
+    backend.planner = StubAgent(deck_draft())
     with pytest.raises(ValueError, match="not applied"):
         await backend.plan_deck(state(), "Add Pricing", research(), deck())
     with pytest.raises(ValueError, match="Removal"):
         await backend.plan_deck(state(), "Remove Overview", research(), deck())
 
 
-def test_new_research_source_ids_do_not_alias_previous_deck_evidence():
+async def test_new_research_source_ids_do_not_alias_previous_deck_evidence():
     new = ResearchDocument(
         title="New research",
         summary="New evidence.",
@@ -410,6 +624,19 @@ def test_new_research_source_ids_do_not_alias_previous_deck_evidence():
     assert ledger["S1"] == deck().sources[0]
     assert ledger["S2"].url == new.sources[0].url
     assert new.sources[0].id == "S1"
+    proposed = deck_draft()
+    proposed.slides.append(
+        SlideSpec(title="New evidence", bullets=["New cited finding."], source_ids=["S2"])
+    )
+    backend = stub_backend()
+    backend.planner = StubAgent(proposed)
+    result = await backend.plan_deck(state(), "Add New evidence", new, deck())
+    assert result.sources == list(ledger.values())
+    assert result.sources[0] == deck().sources[0]
+    assert result.sources[1] == new.sources[0].model_copy(update={"id": "S2"})
+    context = json.loads(backend.planner.calls[0][0][-1].text)
+    assert context["research"] == normalized.model_dump()
+    assert new.sources[0].id == "S1" and new.findings[0].source_ids == ["S1"]
 
 
 async def test_research_uses_real_retrieved_records_not_model_supplied_sources():
@@ -510,7 +737,7 @@ async def test_genuine_maf_structured_run_invokes_secure_web_tool_offline():
                 ],
             }
             finish = "tool_calls"
-        else:
+        elif len(requests) == 2:
             assert any(message["role"] == "tool" for message in payload["messages"])
             assert "Actual tool evidence." in json.dumps(payload["messages"])
             message = {
@@ -521,6 +748,33 @@ async def test_genuine_maf_structured_run_invokes_secure_web_tool_offline():
                         "summary": "A tool-grounded summary.",
                         "findings": [{"text": "Actual tool evidence.", "source_ids": ["S1"]}],
                         "limitations": ["A bounded review."],
+                    }
+                ),
+            }
+            finish = "stop"
+        else:
+            assert len(requests) == 3
+            schema = payload["response_format"]["json_schema"]["schema"]
+            assert set(schema["properties"]) == {"title", "subtitle", "slides"}
+            assert schema["additionalProperties"] is False
+            assert "SourceRecord" not in schema["$defs"]
+            context = json.loads(payload["messages"][-1]["content"])
+            assert context["evidence_sources"] == context["research"]["sources"]
+            assert "with no sources field or source metadata" in payload["messages"][0]["content"]
+            message = {
+                "role": "assistant",
+                "content": json.dumps(
+                    {
+                        "title": "Python",
+                        "subtitle": "Tool-grounded presentation",
+                        "slides": [
+                            {
+                                "title": "Evidence",
+                                "bullets": ["Actual tool evidence."],
+                                "source_ids": ["S1"],
+                                "notes": "A bounded review.",
+                            }
+                        ],
                     }
                 ),
             }
@@ -557,7 +811,10 @@ async def test_genuine_maf_structured_run_invokes_secure_web_tool_offline():
             ),
         )
         result = await backend.research(state(), "Research Python")
-    assert len(requests) == 2
+        planned = await backend.plan_deck(state(), "Create PPT about Python", result)
+    assert len(requests) == 3
     assert requests[0]["response_format"]["type"] == "json_schema"
     assert result.sources[0].title == "Actual tool page"
     assert result.findings[0].source_ids == ["S1"]
+    assert planned.sources == result.sources
+    assert planned.slides[0].source_ids == ["S1"]

@@ -1,7 +1,8 @@
 # Durable research-to-PowerPoint architecture
 
-This is a Python **Microsoft Agent Framework (MAF)** workflow with a terminal/JSON
-harness, not an application UI. The application owns conversation persistence and
+This is a teaching-oriented Python **Microsoft Agent Framework (MAF)** workflow
+with terminal/JSON and local HTTP harnesses, not an application UI or a
+production service. The application owns conversation persistence and
 artifact integrity; MAF owns typed execution within each turn. See the
 [README](../README.md) for verified setup, configuration and commands.
 
@@ -20,6 +21,8 @@ editable source of truth. Blue denotes workflow/control, teal durable state,
 purple immutable artifact references, slate the harness, and dashed amber
 optional delivery. The overview draws the main export path; research-only and
 answer actions are also committed by the same session harness.
+The diagram illustrates the CLI path; the HTTP API enters the same workflow
+and uses the same durable store without adding another orchestration layer.
 
 ## Execution paths: real graph, explicit agent modes
 
@@ -42,9 +45,12 @@ It does not automatically fetch web evidence or pass the latest research:
 the direct decision sets `use_research=False`. Prefer an orchestrated request
 when the new deck needs research.
 
-**Live mode** creates three genuine MAF model agents: an orchestrator, a
+**Live mode** uses a configured Microsoft Foundry deployment and creates three
+genuine MAF model agents: an orchestrator, a
 researcher with public-web tools, and a presentation planner. The planner returns
-a validated `DeckSpec`; trusted application code renders editable PowerPoint
+bounded slide content and citation IDs, not source-record metadata. Python
+rejects unknown IDs, attaches the exact trusted evidence records, and constructs
+the validated `DeckSpec`; trusted application code renders editable PowerPoint
 shapes, text and notes with an illustrative Contoso theme. These are not official
 Contoso brand assets.
 
@@ -53,6 +59,36 @@ of routing, rendering, artifacts and restoration. Its small request grammar is
 not general natural-language understanding, and its "research" is explicitly
 user-supplied demo content without fabricated sources. Live failures must not be
 disguised as successful offline research.
+
+## Local configuration and multi-turn HTTP entry point
+
+The CLI and API explicitly load `.env` from the current working directory,
+without overriding process environment variables. The Foundry connection is
+an OpenAI-compatible v1 endpoint plus a deployment name. `AzureCliCredential`
+uses the developer's existing `az login`; authentication does not require
+copying a token or storing an API key. This is a local testing choice, not a
+claim that Azure CLI credentials are appropriate for hosted workloads.
+Existing Azure Blob storage authentication is independent of model authentication.
+
+`api.py` is a thin, sequential adapter: validate the request, resolve or create
+the session UUID, call `workflow.invoke`, and return the result/artifact download
+locations. Creating a session also executes its first turn. Continuing an
+unknown session is an error, not permission to initialize a new one.
+History reads and downloads only expose committed session artifacts; downloads
+verify the store's size/hash contract before returning bytes.
+
+Every HTTP turn reconstructs model messages from the full committed application
+history and applicable saved research/deck. Restarting the API with the same
+store preserves the conversation; no sticky server memory or provider thread
+is required. A model or worker failure before commit leaves the last successful
+session intact. The API does not implement streaming, per-user authorization,
+request deduplication, cloud deployment or production admission control.
+It binds to loopback for the teaching exercise.
+
+Related agent logic stays in `agents/__init__.py`, with web tools in
+`agents/research/` and deterministic PPT helpers in `agents/pptx/`.
+This keeps the top-level package navigable without turning each sequential step
+into its own abstraction or file.
 
 ## Contracts and artifact handoff
 
@@ -90,7 +126,7 @@ expected hashes are still necessary.
 
 ## Durable conversation is not a MAF checkpoint
 
-For each invocation the harness:
+For each invocation the workflow:
 
 1. Acquires the session lock/lease and loads the last committed `SessionState`,
    or initializes a new session.
@@ -100,8 +136,9 @@ For each invocation the harness:
 3. Runs a fresh MAF graph and requires exactly one typed `RunResult`.
 4. Appends the user turn and resulting assistant reply, advances the revision,
    and commits the session.
-5. Exports verified artifacts locally and, if explicitly requested, attempts
-   OneDrive delivery.
+5. Returns the committed result. The CLI exports verified artifacts locally
+   and, if explicitly requested, attempts OneDrive delivery. The HTTP API
+   provides session-scoped artifact downloads instead.
 
 This restores **the full application conversation history**, not merely a
 summary or the latest prompt. It does not persist every internal model/tool
@@ -188,8 +225,10 @@ sentence is correct:
    Citation consistency does not prove that an excerpt supports a claim.
 3. Keep source IDs and complete source records with the findings when building
    slides. When combining research/decks, avoid reusing an ID for different
-   evidence. The live planner validates source records against supplied
-   evidence; it must not invent replacement citations.
+   evidence. The live planner returns citation IDs only. Python attaches the
+   exact ledger records for cited sources and retains previous-deck sources
+   during revisions. The model is not asked to regenerate long excerpts or
+   timestamps; unknown IDs and model-supplied source metadata are rejected.
 4. Treat page excerpts, persisted history and artifact content as untrusted
    data, not instructions to reveal secrets or execute code. Validate downstream
    use rather than relying only on model prompting.
@@ -215,6 +254,8 @@ presentation is editable PPTX, not a screenshot or fake stdout payload.
 Research Markdown and both structured JSON contracts can be reviewed locally.
 The export operation can retrieve latest committed research JSON or PPTX after
 a restart; consult the README for its supported selectors.
+The HTTP API can retrieve any artifact referenced by a committed turn, including
+older versions, without exporting a container-local file.
 
 OneDrive is an **opt-in delegated Microsoft Graph upload** of the verified PPTX
 bytes also exported locally. It requires a suitable delegated access token,
@@ -246,7 +287,8 @@ when a requested file was not produced. Validation failures and timeouts are
 explicit; broad exception handling must not turn failure into a completed
 artifact. Lease-maintenance failures must abort safe persistence rather than
 being swallowed. Hosted response shape compatibility does not mean the sample
-ships a Foundry HTTP server or a container deployment.
+implements the Foundry hosted-agent protocol or ships a container deployment.
+The local HTTP API is an application adapter, not a Foundry-hosted agent server.
 
 ## Strengths, limits and ownership
 
@@ -267,14 +309,16 @@ and slide content.
 
 ### Validation and critique outcome
 
-The final offline suite passed **197 tests**, with one Windows symlink-privilege
-skip. Ruff passed; the wheel and source distribution built successfully.
-The editable diagram passed both structural and strict layout validation.
-Tests include the actual MAF runtime and a genuine model-agent/tool loop against
+Offline checks use Ruff, pytest and Python package builds. Tests include the
+actual MAF runtime and a genuine model-agent/tool loop against
 a mocked OpenAI transport, not just a hand-written imitation of workflow calls.
 Fresh-process CLI tests exercise restoration, research handoff and revisions;
 Azure/Graph authentication and network boundaries are mocked, not live tenant
 certification.
+HTTP tests cover continued turns, restart restoration, artifact downloads,
+invalid input and failed-turn persistence. Foundry configuration tests construct
+the real client with a mocked token provider; only a separate live run verifies
+the developer's actual login, deployment capabilities and resource access.
 
 Fresh-eyes artifact review found an oversized-deck page-number failure and
 ambiguous reference continuation headings. The renderer now handles three-digit
@@ -291,10 +335,10 @@ schema validity as proof of a concise, presentation-ready narrative.
 
 | Area | Owning paths |
 | --- | --- |
-| User harness and delivery | `src/contoso_agents/cli.py`, `onedrive.py` |
+| User harness and delivery | `src/contoso_agents/api.py`, `cli.py`, `onedrive.py` |
 | Typed graph and worker dispatch | `src/contoso_agents/workflow.py`, `workers.py` |
-| Live/demo agent behavior and bounded web evidence | `src/contoso_agents/agents.py`, `web.py` |
+| Live/demo agent behavior and bounded web evidence | `src/contoso_agents/agents/__init__.py`, `agents/research/` |
 | Versioned contracts, state, artifact integrity and timing | `src/contoso_agents/models.py`, `storage.py`, `telemetry.py` |
-| Editable slides and readable research | `src/contoso_agents/render.py` |
+| Editable slides and readable research | `src/contoso_agents/agents/pptx/` |
 | Consumer setup and validated commands | `README.md` |
 | Architecture and editable visual | `docs/architecture.md`, `diagrams/workflow.drawio`, `diagrams/workflow.svg` |

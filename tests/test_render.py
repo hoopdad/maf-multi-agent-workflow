@@ -6,8 +6,8 @@ from pptx import Presentation
 from pptx.enum.text import PP_ALIGN
 from pydantic import ValidationError
 
+from contoso_agents.agents.pptx import render_deck, research_markdown
 from contoso_agents.models import DeckSpec, Finding, ResearchDocument, SlideSpec, SourceRecord
-from contoso_agents.render import render_deck, research_markdown
 
 
 def source(number=1, *, url=None):

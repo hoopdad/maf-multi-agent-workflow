@@ -20,7 +20,7 @@ DEFAULT_HOSTS = ("en.wikipedia.org", "learn.microsoft.com", "docs.python.org")
 
 
 class WebResourceError(ValueError):
-    """A resource was unsafe, unavailable, or exceeded an evidence limit."""
+    """Reports unsafe, failed, or over-limit web retrieval to the researcher."""
 
 
 def _is_public(address: str) -> bool:
@@ -96,6 +96,8 @@ def validate_url(url: str, hosts: Sequence[str]) -> str:
 
 
 class _ArticleText(HTMLParser):
+    """Extracts page titles and readable article text from fetched HTML for the evidence ledger."""
+
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.title: list[str] = []
@@ -128,7 +130,7 @@ class _ArticleText(HTMLParser):
 
 
 class WebResources:
-    """A per-research source ledger with stable S1... IDs and pinned public DNS.
+    """Retrieves bounded public web evidence under stable source IDs for the research step.
 
     Environment: CONTOSO_WEB_ALLOWED_HOSTS is an exact-host comma-separated
     allowlist; CONTOSO_WEB_URLS is a JSON array (or comma/newline-separated URLs).

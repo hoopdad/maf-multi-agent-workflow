@@ -1,7 +1,7 @@
 # Repository index
 
-Freshness: baseline `964336a`, refreshed for the uncommitted Foundry and multi-turn
-HTTP additions and trusted citation handoff on `hoopdad-durable-research-presentations`.
+Freshness: baseline `bd33eef`, covering the Foundry connection, multi-turn HTTP API,
+and trusted citation handoff on `hoopdad-durable-research-presentations`.
 
 ## Areas and boundaries
 
@@ -35,6 +35,7 @@ The isolated-process dispatcher is runnable; remote container transport is an ex
 Start with README for setup and commands; pyproject.toml owns dependencies.
 Teaching sample, not production: keep related sequential logic together rather
 than adding settings/service frameworks. Helpers belong under their agent area.
+Class docstrings begin with one sentence explaining their role in the workflow.
 Use Python 3.11+, Pydantic schemas, explicit errors, and isolated `.venv`.
 MAF core 1.21.0 and OpenAI provider 1.14.4 are independently pinned in pyproject.toml.
 `python -m contoso_agents` is the package entry point; the installed script is `contoso-agents`.

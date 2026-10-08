@@ -61,6 +61,8 @@ def parser() -> argparse.ArgumentParser:
 
 
 class DeliveryError(RuntimeError):
+    """Reports export or upload failure while retaining the completed turn's artifact references."""
+
     def __init__(self, response: dict, cause: Exception):
         super().__init__(str(cause))
         self.response = {

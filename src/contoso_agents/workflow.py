@@ -18,6 +18,8 @@ from .workers import WorkerDispatcher, put_json, read_json
 
 @dataclass
 class SessionGate:
+    """Serializes asynchronous turns for one session to protect committed conversation history."""
+
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     users: int = 0
 
@@ -29,6 +31,8 @@ _session_locks: WeakKeyDictionary[asyncio.AbstractEventLoop, dict[str, SessionGa
 
 @dataclass
 class FlowMessage:
+    """Carries the current session, request, route, and artifacts between workflow executors."""
+
     state: SessionState
     prompt: str
     direct_ppt: bool = False
@@ -42,6 +46,8 @@ class FlowMessage:
 
 
 class OrchestratorExecutor(Executor):
+    """Chooses the research, PPT, or answer path, skipping model routing for direct PPT requests."""
+
     def __init__(self, agents: AgentBackend):
         super().__init__(id="orchestrator")
         self.agents = agents
@@ -57,6 +63,8 @@ class OrchestratorExecutor(Executor):
 
 
 class ResearchExecutor(Executor):
+    """Dispatches research work and forwards stored evidence references to the next executor."""
+
     def __init__(self, store: ArtifactStore, dispatcher: WorkerDispatcher):
         super().__init__(id="researcher")
         self.store = store
@@ -79,6 +87,8 @@ class ResearchExecutor(Executor):
 
 
 class PptExecutor(Executor):
+    """Dispatches PPT work and returns the new deck and presentation artifact references."""
+
     def __init__(self, store: ArtifactStore, dispatcher: WorkerDispatcher):
         super().__init__(id="ppt")
         self.store = store
@@ -120,6 +130,8 @@ class PptExecutor(Executor):
 
 
 class AnswerExecutor(Executor):
+    """Returns summaries, clarifications, or history-based replies without regenerating a PPT."""
+
     def __init__(self, store: ArtifactStore, agents: AgentBackend):
         super().__init__(id="answer")
         self.store = store

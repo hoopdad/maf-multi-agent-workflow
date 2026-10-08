@@ -29,7 +29,7 @@ def redact_url(url: str) -> str:
 
 
 class AzureHttpTimingPolicy(SansIOHTTPPolicy):
-    """A SansIO policy also usable with Blob SDK public raw HTTP hooks."""
+    """Records redacted Azure HTTP timing for storage operations without logging request bodies."""
 
     _context_key = "contoso_http_timing"
 

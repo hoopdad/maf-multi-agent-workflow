@@ -38,6 +38,8 @@ logger = logging.getLogger(__name__)
 
 
 class TurnRequest(BaseModel):
+    """Validates the prompt and direct-PPT flag for the API's first or next conversation turn."""
+
     model_config = ConfigDict(extra="forbid")
 
     prompt: str = Field(min_length=1, max_length=8000)

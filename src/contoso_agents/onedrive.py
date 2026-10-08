@@ -12,6 +12,8 @@ from .models import ArtifactRef
 
 
 class OneDriveReceipt(BaseModel):
+    """Returns the uploaded PPT's OneDrive item ID and browser URL to the delivery caller."""
+
     id: str = Field(min_length=1)
     web_url: str = Field(min_length=1)
 

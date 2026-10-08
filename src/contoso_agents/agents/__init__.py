@@ -26,15 +26,17 @@ from .research import WebResourceError, WebResources
 
 
 class AgentConfigurationError(ValueError):
-    """Live model settings are missing or invalid."""
+    """Stops live agent creation when the configured model connection is missing or invalid."""
 
 
 class UnsupportedDemoRequest(ValueError):
-    """A request is outside the explicitly bounded offline grammar."""
+    """Rejects requests the offline demo cannot fulfill instead of inventing successful results."""
 
 
 @runtime_checkable
 class AgentBackend(Protocol):
+    """Defines the agent operations used by the workflow in both demo and live modes."""
+
     async def route(self, state: SessionState, prompt: str) -> RouteDecision: ...
 
     async def research(self, state: SessionState, prompt: str) -> ResearchDocument: ...
@@ -116,7 +118,7 @@ def _remove_index(previous: DeckSpec, target: str) -> int:
 
 
 class DemoAgents:
-    """OFFLINE: no model calls, no web access, no claims of researched facts.
+    """Exercises the workflow offline without making model calls or retrieving web evidence.
 
     Supported grammar is intentionally small; additions preserve existing slides,
     removals name an exact title or 1-based content slide, and recreation is exact.
@@ -333,6 +335,8 @@ class DemoAgents:
 
 
 class _ResearchDraft(BaseModel):
+    """Captures the research model's findings before Python attaches verified web source records."""
+
     model_config = ConfigDict(extra="forbid")
     title: str = Field(min_length=1, max_length=160)
     summary: str = Field(min_length=1, max_length=4000)
@@ -341,6 +345,8 @@ class _ResearchDraft(BaseModel):
 
 
 class _DeckDraft(BaseModel):
+    """Captures slide content and citation IDs before Python attaches the trusted source records."""
+
     model_config = ConfigDict(extra="forbid")
     title: str = Field(min_length=1, max_length=100)
     subtitle: str = Field(default="", max_length=160)
@@ -505,7 +511,7 @@ def _evidence_context(
 
 
 class LiveAgents:
-    """Three MAF model agents with application-owned history and verified web tools."""
+    """Runs MAF model agents for routing, web research, slide planning, and conversation replies."""
 
     def __init__(
         self,

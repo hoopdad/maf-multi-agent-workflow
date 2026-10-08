@@ -26,19 +26,21 @@ from .telemetry import AzureHttpTimingPolicy
 
 
 class ArtifactIntegrityError(ValueError):
-    """An artifact or persisted session does not match its contract."""
+    """Signals corrupt artifact bytes or inconsistent session state to stop unsafe use."""
 
 
 class SessionConflictError(RuntimeError):
-    """The proposed revision is not the successor of the persisted revision."""
+    """Rejects a session commit that would overwrite or skip the expected next revision."""
 
 
 class LeaseLostError(RuntimeError):
-    """A renewable Azure session lease can no longer protect this turn."""
+    """Stops a turn when its Azure session lease can no longer protect a safe state update."""
 
 
 @runtime_checkable
 class ArtifactStore(Protocol):
+    """Defines the persistence and artifact operations shared by the workflow and its workers."""
+
     def put_artifact(
         self, session_id: str, filename: str, data: bytes, content_type: str
     ) -> ArtifactRef: ...
@@ -149,6 +151,8 @@ def _make_directories(path: Path, *, exist_ok: bool = True) -> None:
 
 
 class LocalStore:
+    """Persists sessions and immutable artifacts on local disk across workflow process restarts."""
+
     _lock_registry_guard = threading.Lock()
 
     def __init__(self, root: Path) -> None:
@@ -245,6 +249,8 @@ def _error_code(error: HttpResponseError) -> str | None:
 
 
 class _LeaseGuard:
+    """Renews the Blob session lease and detects lease loss while a workflow turn is running."""
+
     _request_options = {
         "timeout": 10,
         "connection_timeout": 5,
@@ -306,7 +312,7 @@ class _LeaseGuard:
 
 
 class AzureBlobStore:
-    """Use an existing private container, never provision one.
+    """Shares durable sessions and immutable artifacts through an existing private Blob container.
 
     With no supplied credential, CONTOSO_AZURE_CREDENTIAL selects ``default``
     or ``managed_identity``; the latter optionally uses AZURE_CLIENT_ID.

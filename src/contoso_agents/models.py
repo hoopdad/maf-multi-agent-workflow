@@ -21,10 +21,14 @@ def unique_citations(values: list[str]) -> list[str]:
 
 
 class Contract(BaseModel):
+    """Applies shared validation rules to data exchanged across workflow and worker boundaries."""
+
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
 
 class ArtifactRef(Contract):
+    """Identifies a stored artifact so workers can retrieve and verify its exact bytes."""
+
     schema_version: Literal[1] = 1
     key: str = Field(min_length=1, max_length=512)
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -51,6 +55,8 @@ class ArtifactRef(Contract):
 
 
 class Turn(Contract):
+    """Records a committed user or assistant message with its timestamp and artifact references."""
+
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1)
     created_at: str = Field(default_factory=utc_now)
@@ -58,6 +64,8 @@ class Turn(Contract):
 
 
 class SessionState(Contract):
+    """Carries committed history, revision, and artifact references into the next workflow turn."""
+
     schema_version: Literal[1] = 1
     session_id: str
     revision: int = Field(default=0, ge=0)
@@ -83,6 +91,8 @@ class SessionState(Contract):
 
 
 class SourceRecord(Contract):
+    """Keeps retrieved web evidence and source IDs together for research and slide citations."""
+
     id: str = Field(pattern=r"^S[1-9][0-9]*$")
     title: str = Field(min_length=1, max_length=200)
     url: str = Field(min_length=1, max_length=2048)
@@ -99,6 +109,8 @@ class SourceRecord(Contract):
 
 
 class Finding(Contract):
+    """Links a research finding to the retrieved source IDs that support it."""
+
     text: str = Field(min_length=1, max_length=1000)
     source_ids: list[str] = Field(default_factory=list, max_length=12)
 
@@ -109,6 +121,8 @@ class Finding(Contract):
 
 
 class ResearchDocument(Contract):
+    """Carries findings, evidence, and limitations from the researcher to the PPT worker."""
+
     title: str = Field(min_length=1, max_length=160)
     summary: str = Field(min_length=1, max_length=4000)
     findings: list[Finding] = Field(min_length=1, max_length=20)
@@ -127,6 +141,8 @@ class ResearchDocument(Contract):
 
 
 class SlideSpec(Contract):
+    """Describes one editable slide's content, citations, and speaker notes for the renderer."""
+
     title: str = Field(min_length=1, max_length=80)
     bullets: list[str] = Field(min_length=1, max_length=5)
     source_ids: list[str] = Field(default_factory=list, max_length=12)
@@ -146,6 +162,8 @@ class SlideSpec(Contract):
 
 
 class DeckSpec(Contract):
+    """Carries validated slides and trusted sources into rendering and later revisions."""
+
     title: str = Field(min_length=1, max_length=100)
     subtitle: str = Field(default="", max_length=160)
     slides: list[SlideSpec] = Field(min_length=1, max_length=12)
@@ -166,6 +184,8 @@ Action = Literal["research", "ppt", "research_ppt", "clarify"]
 
 
 class RouteDecision(Contract):
+    """Tells the workflow which worker or answer path to run and what instruction to pass along."""
+
     action: Action
     instruction: str = Field(min_length=1, max_length=8000)
     use_research: bool = False
@@ -173,6 +193,8 @@ class RouteDecision(Contract):
 
 
 class WorkerJob(Contract):
+    """Hands a worker its task and references to the session, research, and prior deck artifacts."""
+
     schema_version: Literal[1] = 1
     session_id: str
     kind: Literal["research", "ppt"]
@@ -195,12 +217,16 @@ class WorkerJob(Contract):
 
 
 class WorkerResult(Contract):
+    """Returns a worker's artifact references so the orchestrator can continue the workflow."""
+
     session_id: str
     kind: Literal["research", "ppt"]
     artifacts: list[ArtifactRef] = Field(min_length=1)
 
 
 class RunResult(Contract):
+    """Returns the turn's action, reply, artifacts, and committed revision to the CLI or API."""
+
     session_id: str
     action: Action
     message: str = Field(min_length=1)

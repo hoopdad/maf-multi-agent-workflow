@@ -106,6 +106,8 @@ async def execute_job(
 
 
 class WorkerDispatcher(Protocol):
+    """Defines the job dispatch boundary between workflow executors and research or PPT workers."""
+
     async def invoke(self, job: WorkerJob) -> WorkerResult: ...
 
 
@@ -125,6 +127,8 @@ def validate_worker_result(job: WorkerJob, result: WorkerResult) -> WorkerResult
 
 
 class InProcessDispatcher:
+    """Runs worker jobs in the current process using the same immutable-reference handoff."""
+
     def __init__(self, store: ArtifactStore, agents: AgentBackend):
         self.store = store
         self.agents = agents
@@ -135,7 +139,7 @@ class InProcessDispatcher:
 
 
 class ProcessDispatcher:
-    """Separate processes today; the same envelopes can be carried by a remote transport."""
+    """Runs workers in separate processes and verifies their artifact manifests and bytes."""
 
     def __init__(self, store: ArtifactStore, agent_mode: str, timeout: float = 120):
         if not math.isfinite(timeout) or not 0 < timeout <= 3600:
